@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "691571373089",
+    "project_id": "smart-farmasi",
+    "storage_bucket": "smart-farmasi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:691571373089:android:55ce01ee6e175f91e2df60",
+        "android_client_info": {
+          "package_name": "com.smartfarmasi.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "691571373089-0bel2hsakmfo8u8841oljlc0iruhk8q1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.smartfarmasi.app",
+            "certificate_hash": "fa68165cbb2a9d1033172a4dbcb24ef64dca4dca"
+          }
+        },
+        {
+          "client_id": "691571373089-t2r3oajabh78af9r1veh4oc5hhb4ebjg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhFApCia7hysrc3mm5EtvYUPGcjNgscvY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "691571373089-t2r3oajabh78af9r1veh4oc5hhb4ebjg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

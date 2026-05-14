@@ -14,17 +14,61 @@ def create_app():
     JWTManager(app)
     CORS(app)
     Migrate(app, db)
+    
+    from app.admin.auth import admin_auth
+    app.register_blueprint(admin_auth)
+    
     init_admin(app)
     
-    from app.api.auth import RegisterAPI, LoginAPI, ProfileAPI
+    from app.api.auth import (
+        ConfirmEmailChangeAPI,
+        ConfirmPasswordChangeAPI,
+        ForgotPasswordAPI,
+        LoginAPI,
+        LoginGoogleAPI,
+        ProfileAPI,
+        RegisterAPI,
+        RequestEmailChangeAPI,
+        RequestAppPasswordAPI,
+        RequestPasswordChangeAPI,
+        ResendOTPAPI,
+        ResetPasswordAPI,
+        SetAppPasswordAPI,
+        VerifyAppPasswordOTPAPI,
+        VerifyOTPAPI,
+    )
     from app.api.users import SaveActivityAPI
+    from app.api.disease_news import (
+        DiseaseNewsImageProxyAPI,
+        DiseaseNewsTrendingAPI,
+        DiseaseNewsListAPI,
+        DiseaseNewsRefreshAPI,
+    )
     
     from flask_restful import Api
     api = Api(app)
-    api.add_resource(RegisterAPI, '/api/register')
+    api.add_resource(RegisterAPI, '/api/register', '/register')
+    api.add_resource(VerifyOTPAPI, '/api/verify-otp', '/verify-otp')
+    api.add_resource(ResendOTPAPI, '/api/resend-otp', '/resend-otp')
+    api.add_resource(ForgotPasswordAPI, '/api/forgot-password')
+    api.add_resource(ResetPasswordAPI, '/api/reset-password')
+    api.add_resource(RequestAppPasswordAPI, '/api/request-app-password')
+    api.add_resource(VerifyAppPasswordOTPAPI, '/api/verify-app-password-otp')
+    api.add_resource(SetAppPasswordAPI, '/api/set-app-password')
+    api.add_resource(RequestEmailChangeAPI, '/api/account/request-email-change')
+    api.add_resource(ConfirmEmailChangeAPI, '/api/account/confirm-email-change')
+    api.add_resource(RequestPasswordChangeAPI, '/api/account/request-password-change')
+    api.add_resource(ConfirmPasswordChangeAPI, '/api/account/confirm-password-change')
     api.add_resource(LoginAPI, '/api/login')
+    api.add_resource(LoginGoogleAPI, '/api/login/google')
     api.add_resource(ProfileAPI, '/api/profile')
     api.add_resource(SaveActivityAPI, '/api/activity')
+    
+    # Disease News endpoints
+    api.add_resource(DiseaseNewsTrendingAPI, '/api/disease-news/trending')
+    api.add_resource(DiseaseNewsListAPI,     '/api/disease-news')
+    api.add_resource(DiseaseNewsRefreshAPI,  '/api/disease-news/refresh')
+    api.add_resource(DiseaseNewsImageProxyAPI, '/api/disease-news/image')
     
     @app.route('/')
     def index():
@@ -50,5 +94,12 @@ def create_app():
             </body>
         </html>
         """
+    
+    # Start background scheduler for disease news auto-refresh and cleanup
+    from app.scheduler import start_scheduler
+    import os
+    # Only run scheduler in main process (not Flask reloader subprocess)
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'false':
+        start_scheduler(app)
     
     return app

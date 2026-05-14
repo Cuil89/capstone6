@@ -1,7 +1,10 @@
 import 'package:get/get.dart';
 
 import '../../features/auth/view/login_view.dart';
+import '../../features/auth/view/app_password_view.dart';
+import '../../features/auth/view/forgot_password_view.dart';
 import '../../features/auth/view/register_view.dart';
+import '../../features/auth/view/verify_otp_view.dart';
 import '../../features/auth/binding/auth_binding.dart';
 import '../../features/home/view/main_navigation_view.dart';
 import '../../features/home/binding/home_binding.dart';
@@ -35,6 +38,21 @@ class AppPages {
     GetPage(
       name: AppRoutes.register,
       page: () => const RegisterView(),
+      binding: AuthBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.verifyOtp,
+      page: () => const VerifyOtpView(),
+      binding: AuthBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.forgotPassword,
+      page: () => const ForgotPasswordView(),
+      binding: AuthBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.appPassword,
+      page: () => const AppPasswordView(),
       binding: AuthBinding(),
     ),
 

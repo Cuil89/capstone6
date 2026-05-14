@@ -7,3 +7,8 @@ flask-migrate
 flask-bcrypt
 flask-cors
 pymysql
+google-auth
+requests
+apscheduler
+feedparser
+python-dotenv

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/controller/auth_controller.dart';
 import '../../../core/routes/app_routes.dart';
+import 'disease_news_section.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -104,10 +105,16 @@ class _HomeViewState extends State<HomeView> with TickerProviderStateMixin {
 
                   const SizedBox(height: 28),
 
+                  // ─── NEWS PENYAKIT TERKINI ───
+                  const DiseaseNewsSection(),
+
+                  const SizedBox(height: 28),
+
                   // ─── RECENT ACTIVITY ───
                   _buildSectionTitle('Aktivitas Terakhir'),
                   const SizedBox(height: 16),
                   _buildRecentActivity(),
+
                 ]),
               ),
             ),

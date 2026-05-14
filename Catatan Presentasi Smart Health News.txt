@@ -1,0 +1,700 @@
+Smart Farmasi
+
+============================================================
+1. RINGKASAN FITUR
+============================================================
+
+Fitur yang dibuat adalah Smart Health News Auto-Update.
+
+Tujuan fitur:
+- Menampilkan berita kesehatan terbaru di halaman Home.
+- Berita tidak hardcode.
+- Berita otomatis update dari API/RSS gratis.
+- Home hanya menampilkan 2 berita utama:
+  1 Indonesia
+  1 Internasional
+- Halaman "Lihat Semua" menampilkan daftar berita aktif.
+- Database dibuat tetap ringan agar aplikasi tidak berat.
+
+Sumber berita:
+- NewsAPI, jika NEWS_API_KEY tersedia di .env
+- Google News RSS
+- Google Trends RSS
+- Kemenkes RSS
+- CDC RSS
+- WHO API/RSS sebagai fallback resmi
+
+
+============================================================
+2. ALUR KERJA SISTEM
+============================================================
+
+Alur backend:
+
+1. Backend mengambil kandidat berita dari beberapa sumber.
+2. Setiap berita diparsing menggunakan feedparser atau JSON API.
+3. Sistem memfilter berita agar hanya berita yang relevan dengan kesehatan,
+   penyakit, wabah, virus, vaksin, infeksi, dan topik sejenis yang dipakai.
+4. Sistem menghitung trend_score berdasarkan:
+   - sumber berita
+   - seberapa baru berita tersebut
+   - keyword kesehatan/penyakit
+   - sinyal trending
+   - alert level
+5. Berita dideduplikasi agar berita yang sama tidak dobel di database.
+6. Sistem memilih maksimal 10 berita aktif:
+   - 5 berita Indonesia
+   - 5 berita Internasional
+7. Data yang tidak masuk 10 berita aktif dipangkas dari database.
+8. Flutter mengambil data dari endpoint backend.
+
+Alur Flutter:
+
+1. Home memanggil endpoint /api/disease-news/trending.
+2. Backend mengembalikan 2 berita:
+   - top 1 Indonesia
+   - top 1 Internasional
+3. UI menampilkan card berita yang berisi:
+   - gambar berita
+   - badge alert
+   - label region
+   - judul
+   - ringkasan singkat
+   - sumber
+   - tanggal
+   - tombol Baca
+4. Tombol Baca membuka link berita asli.
+
+
+============================================================
+3. FILE BACKEND YANG DIBUAT / DIUBAH
+============================================================
+
+A. smart_farmasi_backend/app/api/disease_news.py
+
+Ini file utama fitur Smart Health News.
+
+Isi core di dalam file ini:
+
+1. Konstanta limit database
+
+   ACTIVE_NEWS_TOTAL_LIMIT = 10
+   ACTIVE_NEWS_PER_REGION_LIMIT = 5
+
+   Fungsi:
+   - Membatasi database agar hanya menyimpan 10 berita aktif.
+   - 5 berita untuk Indonesia.
+   - 5 berita untuk Internasional.
+
+2. Fetcher berita
+
+   _fetch_newsapi(region_scope)
+   - Mengambil berita dari NewsAPI.
+   - Memakai NEWS_API_KEY dari .env.
+   - Bisa fetch berita Indonesia dan Internasional.
+
+   _fetch_google_news(region_scope)
+   - Mengambil berita dari Google News RSS.
+   - Tidak membutuhkan API key.
+
+   _fetch_google_trends(region_scope)
+   - Mengambil topik trending dari Google Trends RSS.
+   - Dipakai untuk membantu mendeteksi berita yang sedang ramai.
+
+   _fetch_kemenkes_rss()
+   - Mengambil berita resmi dari Kemenkes.
+   - Untuk region Indonesia.
+
+   _fetch_cdc_rss()
+   - Mengambil berita/informasi resmi dari CDC.
+   - Untuk region Internasional.
+
+   _fetch_who_disease_outbreak_news()
+   _fetch_who_outbreaks()
+   - Mengambil data outbreak dari WHO.
+   - Menjadi fallback sumber resmi internasional.
+
+3. Builder dan scoring berita
+
+   _build_news_item()
+   - Membersihkan title dan summary.
+   - Mengecek apakah berita relevan dengan kesehatan.
+   - Menentukan alert_level:
+     low, medium, atau high.
+   - Menentukan badge:
+     Trending, Wabah Global, Perlu Diwaspadai, atau Update Terbaru.
+   - Menghitung trend_score.
+
+4. Deduplikasi berita
+
+   _dedupe_items(items)
+   - Menghapus duplikasi berita.
+   - Prioritas dedupe memakai source_url.
+   - Kalau URL kosong, fallback memakai normalisasi judul.
+
+5. Seleksi 10 berita aktif
+
+   _select_active_news_items(items)
+   - Memilih berita terbaik.
+   - Maksimal 10 berita aktif.
+   - Dibagi 5 Indonesia dan 5 Internasional.
+   - Tetap menjaga variasi sumber agar tidak semua dari satu sumber saja.
+
+6. Cleanup / pruning database
+
+   _prune_disease_news_cache()
+   - Menghapus row berita yang tidak masuk cache aktif.
+   - Tujuannya agar database tidak bengkak.
+   - Setelah refresh, database news tetap kecil.
+
+7. Proses utama refresh
+
+   fetch_and_store_disease_news(app=None)
+   - Mengambil berita dari semua source.
+   - Dedupe.
+   - Pilih top 10 aktif.
+   - Simpan/update database.
+   - Prune data yang tidak diperlukan.
+
+8. Cleanup manual/scheduler
+
+   cleanup_inactive_disease_news()
+   - Dipanggil scheduler sebagai safety cleanup.
+   - Tetap menjaga jumlah data agar kecil.
+
+9. Endpoint API
+
+   DiseaseNewsTrendingAPI
+   Endpoint:
+   GET /api/disease-news/trending
+
+   Fungsi:
+   - Mengirim 2 berita untuk Home.
+   - 1 berita Indonesia.
+   - 1 berita Internasional.
+
+   DiseaseNewsListAPI
+   Endpoint:
+   GET /api/disease-news
+
+   Fungsi:
+   - Mengirim daftar berita untuk halaman Lihat Semua.
+   - Mendukung filter region, source, alert_level, country, search, dan sort.
+
+   DiseaseNewsRefreshAPI
+   Endpoint:
+   POST /api/disease-news/refresh
+
+   Fungsi:
+   - Manual refresh untuk testing/demo.
+   - Setelah refresh, response memberi info active_total dan cache_limit.
+
+   DiseaseNewsImageProxyAPI
+   Endpoint:
+   GET /api/disease-news/image?url=...
+
+   Fungsi:
+   - Proxy gambar berita.
+   - Membantu Flutter Web menampilkan gambar dari source berita.
+   - URL gambar tetap disimpan sebagai image_url, bukan file/blob.
+
+
+B. smart_farmasi_backend/app/scheduler.py
+
+File ini dibuat untuk menjalankan proses otomatis di background.
+
+Fungsi utama:
+
+start_scheduler(app)
+- Menyalakan scheduler ketika backend Flask start.
+- Menggunakan APScheduler.
+
+Job yang dijalankan:
+
+1. Refresh job
+   - Jalan setiap 1 jam.
+   - Memanggil fetch_and_store_disease_news(app=app).
+   - Tujuan: berita selalu update otomatis.
+
+2. Cleanup job
+   - Jalan setiap 2 hari.
+   - Memanggil cleanup_inactive_disease_news(app=app).
+   - Tujuan: safety cleanup agar database tetap ringan.
+
+3. Initial fetch
+   - Jalan sekali setelah backend start.
+   - Delay 10 detik agar tidak menghambat startup backend.
+
+
+C. smart_farmasi_backend/app/models.py
+
+File ini berisi model database SQLAlchemy.
+
+Model penting:
+
+class DiseaseNews(db.Model)
+
+Field penting:
+
+- title
+  Judul berita.
+
+- disease_name
+  Nama penyakit/topik kesehatan yang terdeteksi.
+
+- summary
+  Ringkasan berita.
+
+- country
+  Negara/region berita.
+
+- source_name
+  Nama sumber berita, misalnya Kemenkes, WHO, CDC, Vanity Fair, dll.
+
+- source_url
+  Link asli berita.
+
+- image_url
+  Link gambar berita.
+  Catatan: gambar tidak disimpan sebagai file/blob di database agar DB tetap ringan.
+
+- alert_level
+  Level alert:
+  low, medium, atau high.
+
+- badge
+  Label UI:
+  Trending, Wabah Global, Perlu Diwaspadai, Update Terbaru.
+
+- region_scope
+  Region berita:
+  indonesia atau international.
+
+- trend_score
+  Skor untuk menentukan berita mana yang paling layak tampil.
+
+- trend_keyword
+  Keyword yang membuat berita dianggap relevan/trending.
+
+- is_trending
+  Penanda apakah berita dianggap trending.
+
+- published_at
+  Tanggal publikasi berita.
+
+- fetched_at
+  Waktu berita diambil oleh backend.
+
+- is_active
+  Menandakan berita masih dipakai di UI.
+
+
+D. smart_farmasi_backend/app/__init__.py
+
+File ini berfungsi untuk register endpoint API ke Flask.
+
+Endpoint yang ditambahkan:
+
+- /api/disease-news/trending
+- /api/disease-news
+- /api/disease-news/refresh
+- /api/disease-news/image
+
+File ini juga menyalakan scheduler:
+
+from app.scheduler import start_scheduler
+start_scheduler(app)
+
+
+E. smart_farmasi_backend/app/config.py
+
+File konfigurasi backend.
+
+Bagian penting:
+
+NEWS_API_KEY = os.environ.get('NEWS_API_KEY') or ''
+
+Fungsi:
+- Membaca API key NewsAPI dari file .env.
+- API key tidak ditulis langsung di source code agar lebih aman.
+
+
+F. smart_farmasi_backend/requirements.txt
+
+Dependency backend yang penting untuk fitur ini:
+
+- apscheduler
+  Untuk scheduler auto-refresh dan cleanup.
+
+- feedparser
+  Untuk parsing RSS dari Google News, Google Trends, Kemenkes, dan CDC.
+
+- requests
+  Untuk HTTP request ke API/RSS.
+
+
+============================================================
+4. FILE DATABASE MIGRATION
+============================================================
+
+A. smart_farmasi_backend/migrations/versions/9b1f7a4d2c6e_add_health_news_trend_fields.py
+
+Fungsi:
+- Menambah field untuk fitur trending news.
+
+Field yang ditambahkan:
+- region_scope
+- trend_score
+- trend_keyword
+
+
+B. smart_farmasi_backend/migrations/versions/b7a2d9e48f31_add_disease_news_image_url.py
+
+Fungsi:
+- Menambah field image_url ke tabel disease_news.
+
+Alasan:
+- UI perlu menampilkan gambar berita.
+- Yang disimpan hanya URL gambar, bukan file gambar.
+- Database jadi tetap ringan.
+
+
+============================================================
+5. FILE FLUTTER YANG DIBUAT / DIUBAH
+============================================================
+
+A. lib/data/models/disease_news_model.dart
+
+File model data di Flutter.
+
+Fungsi:
+- Mengubah JSON dari backend menjadi object DiseaseNewsModel.
+- Dipakai oleh UI dan controller.
+
+Field penting:
+- title
+- summary
+- sourceName
+- sourceUrl
+- imageUrl
+- alertLevel
+- badge
+- regionScope
+- trendScore
+- trendKeyword
+- publishedAt
+- fetchedAt
+
+Getter penting:
+
+formattedDate
+- Mengubah tanggal menjadi format Indonesia.
+
+regionLabel
+- Mengubah region_scope:
+  indonesia menjadi Indonesia
+  international menjadi Internasional
+
+
+B. lib/features/home/controller/disease_news_controller.dart
+
+File controller GetX untuk fitur news.
+
+State penting:
+
+- trendingNews
+  List berita untuk Home.
+
+- allNews
+  List berita untuk halaman Lihat Semua.
+
+- isLoadingTrending
+  Loading state untuk Home.
+
+- isLoadingAll
+  Loading state untuk halaman Lihat Semua.
+
+- hasError dan errorMessage
+  Untuk handle error API.
+
+- lastUpdated
+  Untuk menampilkan kapan berita terakhir update.
+
+Fungsi penting:
+
+fetchTrending()
+- Mengambil data dari endpoint /api/disease-news/trending.
+- Dipakai di Home.
+
+fetchAll()
+- Mengambil data dari endpoint /api/disease-news.
+- Dipakai di halaman Lihat Semua.
+- Mendukung pagination dan filter.
+
+applySearch()
+- Menerapkan pencarian berita.
+
+applyFilter()
+- Menerapkan filter source, level, country, region, dan sort.
+
+triggerRefresh()
+- Memanggil endpoint /api/disease-news/refresh.
+- Dipakai untuk manual refresh.
+
+
+C. lib/features/home/view/disease_news_section.dart
+
+File UI news di Home.
+
+Fungsi:
+- Menampilkan section "News Penyakit Terkini".
+- Menampilkan 2 card berita.
+- Menampilkan gambar berita.
+- Menampilkan badge alert.
+- Menampilkan label Indonesia/Internasional.
+- Menampilkan sumber dan tanggal.
+- Menyediakan tombol Baca yang membuka link berita asli.
+
+Komponen penting:
+
+DiseaseNewsSection
+- Widget utama yang dipasang di Home.
+
+_DiseaseNewsCard
+- Card compact untuk satu berita.
+
+_NewsThumbnail
+- Menampilkan gambar berita.
+- Gambar diambil dari imageUrl melalui proxy backend.
+
+_BadgeWidget
+- Menampilkan label seperti Wabah Global atau Trending.
+
+_RegionChip
+- Menampilkan label Indonesia atau Internasional.
+
+_ReadButton
+- Tombol Baca untuk membuka link asli.
+
+Catatan UI:
+- Warna tombol dan card sudah disesuaikan dengan tema hijau Smart Farmasi.
+- Card dibuat compact agar tidak terlalu besar.
+- Badge alert dibuat lebih soft agar tidak terlalu kontras.
+
+
+D. lib/features/home/view/disease_news_list_view.dart
+
+File halaman Lihat Semua.
+
+Fungsi:
+- Menampilkan daftar semua berita aktif.
+- Mendukung filter/search.
+- Bisa membuka link berita asli.
+- Menggunakan url_launcher.
+
+
+E. lib/features/home/view/home_view.dart
+
+File halaman Home.
+
+Bagian penting:
+
+const DiseaseNewsSection()
+
+Fungsi:
+- Memasang section news ke halaman Home.
+
+
+F. lib/features/home/binding/home_binding.dart
+
+File binding GetX.
+
+Bagian penting:
+
+Get.lazyPut<DiseaseNewsController>(() => DiseaseNewsController(), fenix: true)
+
+Fungsi:
+- Mendaftarkan DiseaseNewsController agar bisa dipakai di Home.
+
+
+G. lib/core/api/api_provider.dart
+
+File provider API Flutter.
+
+Fungsi penting:
+
+proxiedImageUrl(String imageUrl)
+- Mengubah URL gambar asli menjadi URL proxy backend.
+- Dipakai agar gambar berita bisa tampil lebih aman di Flutter Web.
+
+getDiseaseNewsTrending()
+- Request ke /api/disease-news/trending.
+
+getDiseaseNewsList()
+- Request ke /api/disease-news.
+- Mendukung query page, per_page, sort, search, source, alert_level, country, region.
+
+refreshDiseaseNews()
+- Request ke /api/disease-news/refresh.
+
+
+H. pubspec.yaml
+
+Dependency Flutter yang ditambahkan:
+
+url_launcher
+
+Fungsi:
+- Untuk membuka link berita asli saat tombol Baca ditekan.
+
+
+============================================================
+6. ENDPOINT API
+============================================================
+
+1. GET /api/disease-news/trending
+
+Dipakai oleh Home.
+
+Response:
+- success
+- data
+- total
+- last_updated
+
+Data berisi maksimal 2 berita:
+- 1 Indonesia
+- 1 Internasional
+
+
+2. GET /api/disease-news
+
+Dipakai oleh halaman Lihat Semua.
+
+Mendukung query:
+- page
+- per_page
+- sort
+- search
+- source
+- alert_level
+- country
+- region
+
+
+3. POST /api/disease-news/refresh
+
+Dipakai untuk manual refresh.
+
+Response penting:
+- saved
+- active_total
+- cache_limit
+
+Contoh konsep response:
+
+active_total = 10
+cache_limit = 10
+
+Artinya database news dijaga hanya 10 berita aktif.
+
+
+4. GET /api/disease-news/image?url=...
+
+Dipakai untuk proxy gambar berita.
+
+Alasan dibuat:
+- Beberapa website membatasi akses gambar langsung dari Flutter Web.
+- Backend membantu mengambil gambar lalu mengirimnya ke Flutter.
+
+
+============================================================
+7. STRATEGI AGAR DATABASE TIDAK BENGKAK
+============================================================
+
+Masalah:
+- Kalau berita auto-update terus, database bisa menumpuk banyak row.
+
+Solusi:
+- Database dipakai sebagai cache kecil, bukan arsip permanen.
+
+Policy yang dipakai:
+- Maksimal 10 berita aktif.
+- 5 Indonesia.
+- 5 Internasional.
+- Refresh tiap 1 jam.
+- Setelah refresh, sistem langsung prune data yang tidak masuk 10 berita aktif.
+- Gambar tidak disimpan sebagai file/blob, hanya image_url.
+
+Keuntungan:
+- Database ringan.
+- App lebih cepat.
+- Data tetap fresh.
+- Tidak perlu menyimpan ribuan berita.
+- Cocok untuk fitur edukasi di aplikasi Smart Farmasi.
+
+
+============================================================
+8. CARA MENJELASKAN SAAT PRESENTASI
+============================================================
+
+Versi singkat:
+
+"Pada fitur ini saya membuat news section yang auto-update. Backend mengambil berita kesehatan dari NewsAPI dan beberapa RSS gratis seperti Google News, Google Trends, Kemenkes, CDC, dan WHO. Setelah itu berita difilter agar hanya yang relevan dengan kesehatan, lalu diberi trend_score. Home hanya menampilkan dua berita utama, yaitu satu Indonesia dan satu Internasional. Supaya database tetap ringan, sistem hanya menyimpan 10 berita aktif, yaitu 5 Indonesia dan 5 Internasional. Data lain otomatis dibersihkan setelah refresh."
+
+
+Versi teknis:
+
+"Core backend ada di disease_news.py. Di sana terdapat fetcher untuk beberapa sumber berita, proses scoring, deduplication, pemilihan top 10 berita aktif, serta endpoint untuk Home dan Lihat Semua. Scheduler ada di scheduler.py, digunakan untuk menjalankan refresh berita otomatis setiap 1 jam dan cleanup safety setiap 2 hari. Di Flutter, controller ada di disease_news_controller.dart, model ada di disease_news_model.dart, dan UI Home ada di disease_news_section.dart."
+
+
+Versi alasan desain:
+
+"Saya tidak menyimpan semua berita karena fitur ini bukan portal berita, tetapi hanya smart health news highlight. Karena itu database digunakan sebagai cache kecil. Dengan begitu aplikasi tetap ringan, response API cepat, dan UI tetap menampilkan berita yang fresh."
+
+
+============================================================
+9. HASIL AKHIR FITUR
+============================================================
+
+- Berita tidak hardcode.
+- Auto-update dari backend.
+- Memakai API/RSS gratis.
+- Home menampilkan 2 berita utama.
+- Lihat Semua menampilkan list berita aktif.
+- Ada gambar berita.
+- Ada tombol Baca yang direct ke URL asli.
+- Database dibatasi hanya 10 berita aktif.
+- Scheduler refresh otomatis tiap 1 jam.
+- Cleanup safety tiap 2 hari.
+- UI sudah compact dan sesuai tema Smart Farmasi.
+
+
+============================================================
+10. TESTING YANG SUDAH DILAKUKAN
+============================================================
+
+Backend:
+- Compile Python berhasil.
+- Refresh database berhasil.
+- Database disease_news tetap 10 row aktif.
+- Distribusi aktif:
+  Indonesia = 5
+  Internasional = 5
+- Home items = 2
+
+Flutter:
+- flutter analyze untuk file disease_news_section.dart berhasil.
+- Hasil: No issues found.
+
+
+============================================================
+11. CATATAN PENTING
+============================================================
+
+- Jangan tampilkan API key asli saat presentasi.
+- Cukup jelaskan bahwa API key dibaca dari environment variable atau file .env.
+- Gambar tidak disimpan di database, hanya URL gambar.
+- NewsAPI dipakai jika tersedia, tetapi sistem tetap punya fallback RSS gratis.
+- Jika salah satu sumber gagal, sumber lain tetap berjalan.
+- Database tidak akan bengkak karena hanya menyimpan cache aktif 10 berita.

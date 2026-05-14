@@ -1,4 +1,4 @@
-from app.models import User, UserActivity, db
+from app.models import User, UserActivity, EmailOTP, db
 from datetime import datetime
 
 class AdminController:
@@ -32,3 +32,34 @@ class AdminController:
     def get_recent_activities(limit=10):
         """Fetches the most recent user activities."""
         return UserActivity.query.order_by(UserActivity.timestamp.desc()).limit(limit).all()
+
+    @staticmethod
+    def get_recent_users(limit=8):
+        """Fetches the newest users for quick admin actions."""
+        return User.query.order_by(User.created_at.desc()).limit(limit).all()
+
+    @staticmethod
+    def delete_user(user_id, current_admin_id=None):
+        """Deletes a user and their dependent records safely."""
+        user = User.query.get(user_id)
+        if not user:
+            return False, 'User tidak ditemukan.'
+
+        if current_admin_id and user.id == current_admin_id:
+            return False, 'Anda tidak bisa menghapus akun admin yang sedang digunakan.'
+
+        if user.role == 'admin':
+            admin_count = User.query.filter_by(role='admin').count()
+            if admin_count <= 1:
+                return False, 'Tidak bisa menghapus admin terakhir.'
+
+        user_email = user.email
+        try:
+            EmailOTP.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+            UserActivity.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+            User.query.filter_by(id=user.id).delete(synchronize_session=False)
+            db.session.commit()
+            return True, f'User {user_email} berhasil dihapus.'
+        except Exception as exc:
+            db.session.rollback()
+            return False, f'Gagal menghapus user: {exc}'

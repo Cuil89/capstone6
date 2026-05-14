@@ -112,7 +112,7 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 10),
 
                   // Logo & Title in the gradient area
                   FadeTransition(
@@ -211,8 +211,10 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
                               ),
                               decoration: InputDecoration(
                                 hintText: 'contoh@email.com',
-                                prefixIcon:
-                                    const Icon(Icons.email_outlined, size: 20),
+                                prefixIcon: const Icon(
+                                  Icons.email_outlined,
+                                  size: 20,
+                                ),
                                 errorText: auth.emailError.value.isEmpty
                                     ? null
                                     : auth.emailError.value,
@@ -227,7 +229,8 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
                               children: [
                                 _buildLabel('Password'),
                                 TextButton(
-                                  onPressed: () {},
+                                  onPressed: () =>
+                                      Get.toNamed(AppRoutes.forgotPassword),
                                   style: TextButton.styleFrom(
                                     padding: EdgeInsets.zero,
                                     minimumSize: Size.zero,
@@ -355,6 +358,11 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
 
                             const SizedBox(height: 24),
 
+                            // Google Login Button
+                            Obx(() => _buildGoogleButton()),
+
+                            const SizedBox(height: 24),
+
                             // Register Link
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -391,6 +399,90 @@ class _LoginViewState extends State<LoginView> with TickerProviderStateMixin {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGoogleButton() {
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Color(0xFFFAFAFA)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+            spreadRadius: -2,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: auth.isGoogleLoading.value ? null : auth.signInWithGoogle,
+          borderRadius: BorderRadius.circular(16),
+          splashColor: const Color(0xFF4285F4).withValues(alpha: 0.08),
+          highlightColor: const Color(0xFF4285F4).withValues(alpha: 0.05),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (auth.isGoogleLoading.value)
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF4285F4),
+                      ),
+                    ),
+                  )
+                else ...[
+                  // Google Logo from IconScout
+                  Image.network(
+                    'https://cdn.iconscout.com/icon/free/png-512/free-google-logo-icon-download-in-svg-png-gif-file-formats--technology-social-media-company-brand-vol-1-pack-logos-icons-189813.png',
+                    height: 24,
+                    width: 24,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.g_mobiledata_rounded,
+                      size: 32,
+                      color: Color(0xFF4285F4),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Text dengan typography premium
+                  Text(
+                    'Lanjutkan dengan Google',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF111827),
+                      letterSpacing: -0.2,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
