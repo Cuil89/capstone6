@@ -1,0 +1,75 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Node / NPM
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Python/Backend related
+**/venv/
+**/__pycache__/
+**/*.pyc
+.env
+smart_farmasi_backend/
+android/app/google-services.json
+android/local.properties
+get_sha1.bat
+Catatan Presentasi Smart Health News.txt
+.vscode/
+.idea/
+.agents/
+
+# AI/Agent Metadata (Hidden from GitHub)
+.agents/
+.kilo/
+.gemini/
+.antigravity/
+.antigravityignore
+skills-lock.json
+task.md
+implementation_plan.md
+walkthrough.md
+research_notes.md
+experiment_results.md
+analysis_results.md
+scratch/
