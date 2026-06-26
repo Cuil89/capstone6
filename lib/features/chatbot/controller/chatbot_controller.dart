@@ -73,14 +73,4 @@ class ChatbotController extends GetxController {
       ),
     );
   }
-
-  void _addWelcome() {
-    messages.add(
-      Message(
-        content:
-            'Halo, saya asisten SEHATI. Saya bisa bantu jelaskan gejala ringan, aturan pakai umum, dan kapan sebaiknya konsultasi.',
-        isUser: false,
-      ),
-    );
-  }
 }

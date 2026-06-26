@@ -8,7 +8,6 @@
 //   final mock = MockAuthController();
 //   Get.put<AuthController>(mock);   // ← works karena mock IS-A AuthController
 
-import 'package:get/get.dart';
 import 'package:smart_farmasi1/features/auth/controller/auth_controller.dart';
 
 class MockAuthController extends AuthController {
@@ -16,6 +15,12 @@ class MockAuthController extends AuthController {
   @override
   void onInit() {
     // Sengaja kosong – tidak memanggil super.onInit()
+  }
+
+  @override
+  void onClose() {
+    // Override tanpa super untuk testing
+    onInit();
   }
 
   // ── Data dummy helpers ────────────────────────────────────────────────────
@@ -142,35 +147,20 @@ class MockAuthController extends AuthController {
   Future<bool> requestAppPasswordOtp(String email) async => true;
 
   @override
-  Future<bool> verifyAppPasswordOtp(String email, String otp) async => true;
-
-  @override
-  Future<bool> setAppPassword({
+  Future<String?> verifyAppPasswordOtp({
     required String email,
     required String otp,
+  }) async => 'mock_setup_token';
+
+  @override
+  Future<bool> setAppPasswordWithSetupToken({
+    required String email,
+    required String setupToken,
     required String password,
     required String passwordConfirmation,
   }) async => true;
 
-  @override
-  Future<bool> changeEmail({
-    required String newEmail,
-    required String otp,
-  }) async => true;
-
-  @override
-  Future<bool> changePassword({
-    required String currentOrOtp,
-    required String newPassword,
-    required String passwordConfirmation,
-    bool isOtp = false,
-  }) async => true;
-
-  @override
-  Future<bool> deactivateAccount({
-    required String reason,
-    required String confirmation,
-    String? otp,
-    String? password,
-  }) async => true;
+  // changeEmail tidak ada di AuthController – hapus
+  // changePassword tidak ada di AuthController – hapus
+  // deactivateAccount tidak ada di AuthController – hapus
 }

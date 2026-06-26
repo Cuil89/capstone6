@@ -47,10 +47,16 @@ yarn.lock
 
 # Python/Backend related
 **/venv/
+**/.venv/
 **/__pycache__/
 **/*.pyc
 .env
 smart_farmasi_backend/
+*.faiss
+*.npy
+**/output/
+**/mid.json
+**/MID.xlsx
 android/app/google-services.json
 android/local.properties
 get_sha1.bat

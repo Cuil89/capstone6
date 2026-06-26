@@ -316,7 +316,7 @@ class _PharmacyList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
       itemCount: pharmacies.length + 2,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         if (index == 0) return _LocationHeader(controller: controller);
         if (index == 1) return _MapsSearchButton(controller: controller);
