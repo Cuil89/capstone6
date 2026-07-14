@@ -470,3 +470,181 @@ class ChatSessionDetailAPI(Resource):
         except Exception as e:
             db.session.rollback()
             return {'message': f'Internal Server Error: {str(e)}'}, 500
+
+class SymptomAnalyzeAPI(Resource):
+    @jwt_required()
+    def post(self):
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        symptoms = data.get('symptoms', [])
+        
+        if not symptoms:
+            return {'message': 'Symptoms list is required'}, 400
+            
+        symptoms_str = ", ".join(symptoms)
+        
+        try:
+            # Retrieve config values
+            api_key = current_app.config.get('OPENROUTER_API_KEY')
+            model_name = current_app.config.get('OPENROUTER_MODEL', 'google/gemini-2.5-flash')
+            search_url = current_app.config.get('SEARCH_SERVICE_URL', 'http://127.0.0.1:8000')
+            gemini_key = current_app.config.get('GEMINI_API_KEY') or os.environ.get('GEMINI_API_KEY')
+            groq_key = current_app.config.get('GROQ_API_KEY') or os.environ.get('GROQ_API_KEY')
+            groq_model = current_app.config.get('GROQ_MODEL', 'llama-3.3-70b-specdec')
+            
+            # 1. Start RAG service
+            check_and_start_search_service(search_url)
+            
+            # 2. Query RAG using symptoms
+            prompt = f"Gejala pasien: {symptoms_str}. Obat apa yang cocok?"
+            contexts = retrieve_contexts(prompt, search_url)
+            contexts = [c for c in contexts if c.get("score", 99.0) <= 22.0]
+            
+            contexts_str = ""
+            for i, doc in enumerate(contexts):
+                contexts_str += f"\n[Dokumen {i+1}] (Sumber: {doc.get('source', 'Unknown')})\n{doc.get('text', '')}\n"
+            
+            # 3. LLM Request System Prompt
+            system_content = (
+                "Anda adalah AI asisten apoteker SEHATI. Tugas Anda adalah memberikan 3 rekomendasi obat "
+                "yang paling cocok berdasarkan gejala yang diinputkan pengguna dengan memanfaatkan database internal SEHATI.\n\n"
+                "PENTING: Balas HANYA dengan format JSON ARRAY murni (tanpa markdown ```json ... ``` atau pembungkus lain). "
+                "Setiap objek dalam array harus memiliki kunci-kunci berikut:\n"
+                "- 'name': nama obat (misal: Paracetamol, Promag, dll)\n"
+                "- 'type': jenis/kategori obat\n"
+                "- 'desc': deskripsi singkat obat\n"
+                "- 'indication': indikasi khasiat\n"
+                "- 'dose': aturan pakai & dosis secara awam\n"
+                "- 'side_effect': efek samping\n"
+                "- 'warning': perhatian penggunaan\n"
+                "- 'score': skor kecocokan (0.1 - 1.0)\n"
+                "- 'reason': alasan pemilihan obat ini berdasarkan gejala pasien\n\n"
+                "Database internal SEHATI:\n"
+                f"{contexts_str}"
+            )
+            
+            user_content = f"Berikan 3 rekomendasi obat terbaik dalam format JSON ARRAY murni untuk keluhan gejala berikut: {symptoms_str}"
+            
+            raw_response = None
+            
+            # Try Groq
+            if not raw_response and groq_key:
+                print("SymptomAnalyze: Trying Groq...")
+                try:
+                    url = "https://api.groq.com/openai/v1/chat/completions"
+                    headers = {
+                        "Authorization": f"Bearer {groq_key}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": groq_model,
+                        "messages": [
+                            {"role": "system", "content": system_content},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "temperature": 0.2
+                    }
+                    res = requests.post(url, json=payload, headers=headers, timeout=20.0)
+                    if res.status_code == 200:
+                        raw_response = res.json().get("choices", [])[0].get("message", {}).get("content", "").strip()
+                except Exception as e:
+                    print(f"SymptomAnalyze: Groq error: {e}")
+            
+            # Try OpenRouter
+            if not raw_response and api_key:
+                print("SymptomAnalyze: Trying OpenRouter...")
+                try:
+                    url = "https://openrouter.ai/api/v1/chat/completions"
+                    headers = {
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://sehati-app.com",
+                        "X-Title": "SEHATI Symptom Analyzer"
+                    }
+                    payload = {
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": system_content},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "temperature": 0.2
+                    }
+                    res = requests.post(url, json=payload, headers=headers, timeout=20.0)
+                    if res.status_code == 200:
+                        raw_response = res.json().get("choices", [])[0].get("message", {}).get("content", "").strip()
+                except Exception as e:
+                    print(f"SymptomAnalyze: OpenRouter error: {e}")
+                    
+            # Try Gemini
+            if not raw_response and gemini_key:
+                print("SymptomAnalyze: Trying Gemini...")
+                try:
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
+                    headers = {"Content-Type": "application/json"}
+                    payload = {
+                        "systemInstruction": {
+                            "parts": [{"text": system_content}]
+                        },
+                        "contents": [
+                            {"role": "user", "parts": [{"text": user_content}]}
+                        ],
+                        "generationConfig": {
+                            "temperature": 0.2
+                        }
+                    }
+                    res = requests.post(url, json=payload, headers=headers, timeout=20.0)
+                    if res.status_code == 200:
+                        raw_response = res.json().get("candidates", [])[0].get("content", {}).get("parts", [])[0].get("text", "").strip()
+                except Exception as e:
+                    print(f"SymptomAnalyze: Gemini error: {e}")
+                    
+            if not raw_response:
+                raise Exception("All LLM providers failed or returned empty response.")
+                
+            # Log Activity
+            new_activity = UserActivity(
+                user_id=int(user_id),
+                activity_type='symptom_check',
+                description=f'Menganalisis gejala: {symptoms_str}'
+            )
+            db.session.add(new_activity)
+            db.session.commit()
+            
+            # Clean JSON Response
+            cleaned_response = raw_response.strip()
+            if cleaned_response.startswith('```json'):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.startswith('```'):
+                cleaned_response = cleaned_response[3:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+                
+            import json
+            recommendations = json.loads(cleaned_response)
+            return {
+                'status': 'success',
+                'symptoms': symptoms,
+                'recommendations': recommendations
+            }, 200
+            
+        except Exception as e:
+            # Fallback to demo data if LLM or parsing fails
+            print(f"Error in SymptomAnalyzeAPI: {str(e)}")
+            return {
+                'status': 'fallback',
+                'symptoms': symptoms,
+                'recommendations': [
+                    {
+                        'name': 'Paracetamol',
+                        'type': 'Tablet generik',
+                        'desc': 'Meredakan demam dan nyeri ringan.',
+                        'indication': 'Demam, sakit kepala',
+                        'dose': 'Ikuti aturan pakai pada kemasan.',
+                        'side_effect': 'Mual ringan pada sebagian orang.',
+                        'warning': 'Hindari penggunaan berlebihan.',
+                        'score': 0.85,
+                        'reason': f'Cocok untuk gejala {symptoms_str} (Mode Fallback)'
+                    }
+                ]
+            }, 200
