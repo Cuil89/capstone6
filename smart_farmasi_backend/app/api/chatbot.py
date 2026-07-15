@@ -33,6 +33,8 @@ def check_and_start_search_service(search_url):
         
         chatbot_dir = os.path.join(workspace_root, 'dataset_chatbot', 'buldchtbot')
         venv_python = os.path.join(chatbot_dir, '.venv', 'Scripts', 'python.exe')
+        if not os.path.exists(venv_python):
+            venv_python = os.path.join(chatbot_dir, '.venv', 'bin', 'python')
         api_script = os.path.join(chatbot_dir, 'scripts', '06_api_server.py')
         
         if os.path.exists(venv_python) and os.path.exists(api_script):
@@ -244,7 +246,7 @@ class ChatbotAPI(Resource):
             # 1. Retrieve config values
             api_key = current_app.config.get('OPENROUTER_API_KEY')
             model_name = current_app.config.get('OPENROUTER_MODEL', 'google/gemini-2.5-flash')
-            search_url = current_app.config.get('SEARCH_SERVICE_URL', 'http://127.0.0.1:8000')
+            search_url = current_app.config.get('SEARCH_SERVICE_URL', 'http://127.0.0.1:8001')
             gemini_key = current_app.config.get('GEMINI_API_KEY') or os.environ.get('GEMINI_API_KEY')
             groq_key = current_app.config.get('GROQ_API_KEY') or os.environ.get('GROQ_API_KEY')
             groq_model = current_app.config.get('GROQ_MODEL', 'llama-3.3-70b-specdec')
@@ -487,7 +489,7 @@ class SymptomAnalyzeAPI(Resource):
             # Retrieve config values
             api_key = current_app.config.get('OPENROUTER_API_KEY')
             model_name = current_app.config.get('OPENROUTER_MODEL', 'google/gemini-2.5-flash')
-            search_url = current_app.config.get('SEARCH_SERVICE_URL', 'http://127.0.0.1:8000')
+            search_url = current_app.config.get('SEARCH_SERVICE_URL', 'http://127.0.0.1:8001')
             gemini_key = current_app.config.get('GEMINI_API_KEY') or os.environ.get('GEMINI_API_KEY')
             groq_key = current_app.config.get('GROQ_API_KEY') or os.environ.get('GROQ_API_KEY')
             groq_model = current_app.config.get('GROQ_MODEL', 'llama-3.3-70b-specdec')
