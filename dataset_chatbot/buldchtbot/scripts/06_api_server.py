@@ -2,9 +2,14 @@ import json
 import os
 import argparse
 from pathlib import Path
-import numpy as np
-import faiss
-from sentence_transformers import SentenceTransformer
+try:
+    import numpy as np
+    import faiss
+    from sentence_transformers import SentenceTransformer
+    HAS_ML = True
+except ImportError:
+    HAS_ML = False
+    print("[WARNING] numpy, faiss, or sentence_transformers not found. Running in Keyword-Only Lite Mode.")
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
@@ -54,25 +59,34 @@ def startup_event():
     flat_file = OUTPUT_DIR / "faiss_index_flatl2.faiss"
     ivf_file = OUTPUT_DIR / "faiss_index_ivfflat.faiss"
 
-    if flat_file.exists():
-        index_flat = faiss.read_index(str(flat_file))
-        print("Loaded Flat L2 FAISS index.")
-    else:
-        print("[WARNING] Flat FAISS index not found.")
+    if HAS_ML:
+        if flat_file.exists():
+            index_flat = faiss.read_index(str(flat_file))
+            print("Loaded Flat L2 FAISS index.")
+        else:
+            print("[WARNING] Flat FAISS index not found.")
 
-    if ivf_file.exists():
-        index_ivf = faiss.read_index(str(ivf_file))
-        print("Loaded IVF Flat FAISS index.")
-    else:
-        print("[WARNING] IVF Flat FAISS index not found.")
+        if ivf_file.exists():
+            index_ivf = faiss.read_index(str(ivf_file))
+            print("Loaded IVF Flat FAISS index.")
+        else:
+            print("[WARNING] IVF Flat FAISS index not found.")
 
-    if not index_flat and not index_ivf:
+        if not index_flat and not index_ivf:
+            print("[WARNING] No FAISS index files found in output/. Semantic search disabled.")
+    else:
+        print("Running without ML dependencies. Semantic search disabled.")
+
+    if HAS_ML and not index_flat and not index_ivf:
         raise RuntimeError("No FAISS index files found in output/.")
 
     # Load model
-    print(f"Loading embedding model: {model_name}...")
-    model = SentenceTransformer(model_name)
-    print("Embedding model loaded successfully.")
+    if HAS_ML:
+        print(f"Loading embedding model: {model_name}...")
+        model = SentenceTransformer(model_name)
+        print("Embedding model loaded successfully.")
+    else:
+        print("Skipping embedding model load.")
 
 @app.get("/")
 @app.get("/health")
@@ -92,13 +106,11 @@ def search(req: SearchRequest):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    # Select index
-    index = index_flat if req.index_type.lower() == "flat" else index_ivf
-    if index is None:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Requested index type '{req.index_type}' is not loaded."
-        )
+    index = None
+    if HAS_ML:
+        index = index_flat if req.index_type.lower() == "flat" else index_ivf
+        if index is None:
+            print(f"[WARNING] Requested index type '{req.index_type}' is not loaded, falling back to keyword.")
 
     start_time = time.time()
 
@@ -135,15 +147,16 @@ def search(req: SearchRequest):
         keyword_results.sort(key=lambda x: x[0])
 
     # 2. Semantic Search using FAISS
-    query_vector = model.encode([req.query], convert_to_numpy=True).astype('float32')
-    # Retrieve double the requested k so we can merge & deduplicate effectively
-    distances, indices = index.search(query_vector, req.k * 2)
-    
     semantic_results = []
-    for dist, idx in zip(distances[0], indices[0]):
-        if idx == -1 or idx >= len(metadata):
-            continue
-        semantic_results.append((float(dist), metadata[idx]))
+    if HAS_ML and index is not None and model is not None:
+        query_vector = model.encode([req.query], convert_to_numpy=True).astype('float32')
+        # Retrieve double the requested k so we can merge & deduplicate effectively
+        distances, indices = index.search(query_vector, req.k * 2)
+        
+        for dist, idx in zip(distances[0], indices[0]):
+            if idx == -1 or idx >= len(metadata):
+                continue
+            semantic_results.append((float(dist), metadata[idx]))
 
     # 3. Merge and Deduplicate Results
     seen_ids = set()
