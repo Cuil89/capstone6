@@ -52,6 +52,11 @@ def _fetch_overpass(lat: float, lng: float, radius: int = 3000):
       node["amenity"="pharmacy"](around:{radius},{lat},{lng});
       way["amenity"="pharmacy"](around:{radius},{lat},{lng});
       relation["amenity"="pharmacy"](around:{radius},{lat},{lng});
+      node["healthcare"="pharmacy"](around:{radius},{lat},{lng});
+      way["healthcare"="pharmacy"](around:{radius},{lat},{lng});
+      relation["healthcare"="pharmacy"](around:{radius},{lat},{lng});
+      node["amenity"="clinic"](around:{radius},{lat},{lng});
+      way["amenity"="clinic"](around:{radius},{lat},{lng});
     );
     out center tags;
     """

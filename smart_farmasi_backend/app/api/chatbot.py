@@ -519,6 +519,8 @@ class SymptomAnalyzeAPI(Resource):
                 "- 'dose': aturan pakai & dosis secara awam\n"
                 "- 'side_effect': efek samping\n"
                 "- 'warning': perhatian penggunaan\n"
+                "- 'contra_indication': kontraindikasi\n"
+                "- 'price': perkiraan harga (dalam bentuk string)\n"
                 "- 'score': skor kecocokan (0.1 - 1.0)\n"
                 "- 'reason': alasan pemilihan obat ini berdasarkan gejala pasien\n\n"
                 "Database internal SEHATI:\n"
